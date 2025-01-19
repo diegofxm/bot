@@ -28,8 +28,9 @@ RSI_OVERBOUGHT = 70  # Nivel de sobrecompra
 RSI_OVERSOLD = 30  # Nivel de sobreventa
 EMA_FAST = 10  # EMA rápida
 EMA_SLOW = 50  # EMA lenta
-TP_PERCENT = 0.02  # Take profit (2%)
 TRADE_PERCENT = 0.05  # Porcentaje del balance para operar (5%)
+TP_PERCENT = 0.02  # Take profit (2%)
+STOP_LOSS_PERCENT = 0.01  # Stop loss (1%)
 
 # Función para enviar notificaciones de Telegram
 def send_telegram_message(token, chat_id, message):
@@ -126,7 +127,7 @@ def trade():
             # Calcular el volumen dinámico
             balance = get_account_balance("USDT")
             trade_volume = balance * TRADE_PERCENT / last_price
-            
+
             # Ajustar el volumen según el filtro LOT_SIZE
             symbol_info = client.get_symbol_info(PAIR)
             lot_size = next(filter(lambda f: f['filterType'] == 'LOT_SIZE', symbol_info['filters']))
@@ -141,7 +142,7 @@ def trade():
                 print(f"Volumen calculado ({trade_volume:.6f}) es menor que el mínimo permitido ({min_qty}). No se enviará la orden.")
                 time.sleep(60)
                 continue
-                
+
             # Estrategia de compra
             if rci < RCI_MIN and rsi < RSI_OVERSOLD and trend_up:
                 print(f"Comprando {trade_volume:.6f} {PAIR} a {last_price}")
@@ -151,8 +152,35 @@ def trade():
                 )
                 print("Orden de compra enviada: ", order)
 
+                # Establecer stop loss y take profit
+                stop_loss_price = last_price * (1 - STOP_LOSS_PERCENT)
+                take_profit_price = last_price * (1 + TP_PERCENT)
+
                 # Notificar por Telegram
-                send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Compra abierta: {trade_volume:.6f} {PAIR} a {last_price}")
+                send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Compra abierta: {trade_volume:.6f} {PAIR} a {last_price}. Stop Loss: {stop_loss_price}, Take Profit: {take_profit_price}")
+
+                # Monitorear la posición
+                while True:
+                    current_price = float(client.get_symbol_ticker(symbol=PAIR)['price'])
+                    if current_price <= stop_loss_price:
+                        print(f"Stop Loss alcanzado. Vendiendo {trade_volume:.6f} {PAIR} a {current_price}")
+                        order = client.order_market_sell(
+                            symbol=PAIR,
+                            quantity=round(trade_volume, 6)
+                        )
+                        print("Orden de venta enviada: ", order)
+                        send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Stop Loss alcanzado. Venta abierta: {trade_volume:.6f} {PAIR} a {current_price}")
+                        break
+                    elif current_price >= take_profit_price:
+                        print(f"Take Profit alcanzado. Vendiendo {trade_volume:.6f} {PAIR} a {current_price}")
+                        order = client.order_market_sell(
+                            symbol=PAIR,
+                            quantity=round(trade_volume, 6)
+                        )
+                        print("Orden de venta enviada: ", order)
+                        send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Take Profit alcanzado. Venta abierta: {trade_volume:.6f} {PAIR} a {current_price}")
+                        break
+                    time.sleep(60)
 
             # Estrategia de venta
             elif rci > RCI_MAX and rsi > RSI_OVERBOUGHT and trend_down:
@@ -163,8 +191,35 @@ def trade():
                 )
                 print("Orden de venta enviada: ", order)
 
+                # Establecer stop loss y take profit
+                stop_loss_price = last_price * (1 + STOP_LOSS_PERCENT)
+                take_profit_price = last_price * (1 - TP_PERCENT)
+
                 # Notificar por Telegram
-                send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Venta abierta: {trade_volume:.6f} {PAIR} a {last_price}")
+                send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Venta abierta: {trade_volume:.6f} {PAIR} a {last_price}. Stop Loss: {stop_loss_price}, Take Profit: {take_profit_price}")
+
+                # Monitorear la posición
+                while True:
+                    current_price = float(client.get_symbol_ticker(symbol=PAIR)['price'])
+                    if current_price >= stop_loss_price:
+                        print(f"Stop Loss alcanzado. Comprando {trade_volume:.6f} {PAIR} a {current_price}")
+                        order = client.order_market_buy(
+                            symbol=PAIR,
+                            quantity=round(trade_volume, 6)
+                        )
+                        print("Orden de compra enviada: ", order)
+                        send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Stop Loss alcanzado. Compra abierta: {trade_volume:.6f} {PAIR} a {current_price}")
+                        break
+                    elif current_price <= take_profit_price:
+                        print(f"Take Profit alcanzado. Comprando {trade_volume:.6f} {PAIR} a {current_price}")
+                        order = client.order_market_buy(
+                            symbol=PAIR,
+                            quantity=round(trade_volume, 6)
+                        )
+                        print("Orden de compra enviada: ", order)
+                        send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, f"Take Profit alcanzado. Compra abierta: {trade_volume:.6f} {PAIR} a {current_price}")
+                        break
+                    time.sleep(60)
 
             # Esperar antes del próximo ciclo
             time.sleep(60 * int(TIMEFRAME[:-1]))
@@ -175,6 +230,6 @@ def trade():
 
 # Probar notificación de Telegram
 if __name__ == "__main__":
-    send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, "¡Hola! El bot de Binance está configurado correctamente.")
+    send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, "¡Hola Diego! El bot de Binance está configurado correctamente.")
     print_account_balances()  # Imprimir balances de la cuenta
     trade()
