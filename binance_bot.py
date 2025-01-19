@@ -110,7 +110,11 @@ def trade():
                 time.sleep(60)
                 continue
 
-            print(f"RCI: {rci:.2f}, RSI: {rsi:.2f}, EMA Fast: {ema_fast[-1]:.2f}, EMA Slow: {ema_slow[-1]:.2f}")
+            # Obtener el último precio
+            last_price = prices[-1]
+
+            # Imprimir indicadores y precio actual
+            print(f"Precio actual: {last_price:.2f}, RCI: {rci:.2f}, RSI: {rsi:.2f}, EMA Fast: {ema_fast[-1]:.2f}, EMA Slow: {ema_slow[-1]:.2f}")
 
             # Confirmar tendencia (EMA)
             trend_up = ema_fast[-1] > ema_slow[-1]
