@@ -122,8 +122,22 @@ def trade():
             # Calcular el volumen dinámico
             balance = get_account_balance("USDT")
             trade_volume = balance * TRADE_PERCENT / last_price
-            trade_volume = max(trade_volume, 0.0001)  # Asegurar un volumen mínimo
+            
+            # Ajustar el volumen según el filtro LOT_SIZE
+            symbol_info = client.get_symbol_info(PAIR)
+            lot_size = next(filter(lambda f: f['filterType'] == 'LOT_SIZE', symbol_info['filters']))
+            min_qty = float(lot_size['minQty'])  # Cantidad mínima
+            step_size = float(lot_size['stepSize'])  # Incremento
 
+            # Ajustar el volumen al incremento permitido
+            trade_volume = max(min_qty, trade_volume // step_size * step_size)
+
+            # Verificar si el volumen cumple con la cantidad mínima
+            if trade_volume < min_qty:
+                print(f"Volumen calculado ({trade_volume:.6f}) es menor que el mínimo permitido ({min_qty}). No se enviará la orden.")
+                time.sleep(60)
+                continue
+                
             # Estrategia de compra
             if rci < RCI_MIN and rsi < RSI_OVERSOLD and trend_up:
                 print(f"Comprando {trade_volume:.6f} {PAIR} a {last_price}")
