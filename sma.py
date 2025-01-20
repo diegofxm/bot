@@ -7,7 +7,7 @@ TELEGRAM_TOKEN = "7483932776:AAGFZMGmDWHuMt6zqtkh-lp318wP86zXli0"  # Token del b
 CHAT_ID = "7985261643"  # Chat ID del usuario
 
 # Parámetros
-PAIR = "bitcoin"  # Par de trading (BTC)
+PAIR = "BTC"  # Par de trading (BTC)
 VS_CURRENCY = "usd"  # Moneda base (USD)
 TIMEFRAME = "daily"  # Temporalidad (1 día)
 SMA_FAST_PERIOD = 10  # SMA rápida
@@ -29,18 +29,25 @@ def send_telegram_message(token, chat_id, message):
 def calculate_sma(prices, period):
     return np.mean(prices[-period:])
 
-# Función para obtener datos históricos de CoinGecko
+# Función para obtener datos históricos de CryptoCompare
 def get_historical_data(pair, vs_currency, days):
-    url = f"https://api.coingecko.com/api/v3/coins/{pair}/market_chart"
-    params = {
-        "vs_currency": vs_currency,
-        "days": days,
-        "interval": TIMEFRAME
+    url = "https://min-api.cryptocompare.com/data/v2/histoday"
+    headers = {
+        "Authorization": "Apikey df549c808eef09d2268ec42e4a5e68ad8d65302ad8a6c014e515ec08764540f4"
     }
-    response = requests.get(url, params=params)
+    params = {
+        "fsym": pair.upper(),
+        "tsym": vs_currency.upper(),
+        "limit": days
+    }
+    response = requests.get(url, headers=headers, params=params)
     data = response.json()
-    prices = [entry[1] for entry in data['prices']]
-    return prices
+    if data['Response'] == 'Success':
+        prices = [entry['close'] for entry in data['Data']['Data']]
+        return prices
+    else:
+        print(f"Error obteniendo datos: {data['Message']}")
+        return []
 
 # Función principal para monitorear y notificar
 def monitor():
@@ -76,5 +83,5 @@ def monitor():
 
 # Probar notificación de Telegram
 if __name__ == "__main__":
-    send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, "¡Hola Diego! El bot de CoinGecko está configurado correctamente.")
+    send_telegram_message(TELEGRAM_TOKEN, CHAT_ID, "¡Hola Diego! El bot de cryptocompare está configurado correctamente.")
     monitor()
